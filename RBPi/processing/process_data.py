@@ -16,19 +16,20 @@ def process_data(data):
             "timestamp": None
         }
 
-    # Coletando as temperaturas e umidades
-    temperatures = [entry['temperature'] for entry in data]
-    humidities = [entry['humidity'] for entry in data]
-
     try:
+        # Convertendo os valores para float
+        temperatures = [float(entry['temperature']) for entry in data]
+        humidities = [float(entry['humidity']) for entry in data]
+
         # Calculando as médias e desvios padrão
         temp_mean = round(statistics.mean(temperatures), 2)
         temp_stdev = round(statistics.stdev(temperatures), 2) if len(temperatures) > 1 else 0.0
         humidity_mean = round(statistics.mean(humidities), 2)
         humidity_stdev = round(statistics.stdev(humidities), 2) if len(humidities) > 1 else 0.0
         timestamp = get_timestamp()
-    except statistics.StatisticsError as e:
-        # Em caso de erro no cálculo, como uma lista com um único item
+
+    except (statistics.StatisticsError, ValueError) as e:
+        # Em caso de erro no cálculo
         return {
             "temperature_mean": None,
             "temperature_stdev": None,
