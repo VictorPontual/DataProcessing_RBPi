@@ -3,13 +3,17 @@ import time
 from sensors.mock_sensor import simulate_sensor_reading
 from processing.batch_manager import save_to_csv
 from processing.process_data import process_data
-from send_data import send_data_to_server
+from send_data import send_data_to_server, send_stored_csv_files
 from utils.config import BATCH_SIZE, READ_INTERVAL
 
 def main():
     """
     Função principal que gerencia a coleta, processamento e envio de dados.
     """
+    print("Enviando arquivos CSV armazenados antes de iniciar a coleta de dados...")
+    send_stored_csv_files()
+    print("Envio concluído. Iniciando coleta de dados.")
+
     data_batch = []
 
     while True:
