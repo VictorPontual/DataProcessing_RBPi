@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoramento de Sensores</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
         body {
             font-family: "Arial", sans-serif;
@@ -13,7 +12,6 @@
             margin: 20px;
             background-color: #eef2f3;
         }
-
         header {
             background: linear-gradient(90deg, #007BFF, #0056b3);
             color: white;
@@ -23,7 +21,6 @@
             border-radius: 10px;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         }
-
         main {
             max-width: 900px;
             margin: 20px auto;
@@ -32,7 +29,6 @@
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
         }
-
         canvas {
             max-width: 100%;
             height: 500px;
@@ -43,11 +39,9 @@
     <header>
         Monitoramento de Sensores com WebSocket
     </header>
-
     <main>
         <canvas id="sensorChart"></canvas>
     </main>
-
     <script>
         let chartInstance = null;
         const ws = new WebSocket("ws://127.0.0.1:8000/api/ws");
@@ -56,6 +50,9 @@
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             console.log("📡 Dados recebidos:", data);
+            console.log("Desv. Padr. Umidade:", data.humidity_stdev);
+            console.log("Desv. Padr. Temp:", data.temperature_stdev);
+
             updateChart(data);
         };
         ws.onclose = () => console.log("❌ Conexão WebSocket fechada.");
@@ -63,17 +60,7 @@
         function updateChart(data) {
             const ctx = document.getElementById("sensorChart").getContext("2d");
 
-            // Gradiente de cor para o gráfico
-            let gradientTemp = ctx.createLinearGradient(0, 0, 0, 400);
-            gradientTemp.addColorStop(0, "rgba(255, 99, 132, 0.8)");
-            gradientTemp.addColorStop(1, "rgba(255, 99, 132, 0.2)");
-
-            let gradientHum = ctx.createLinearGradient(0, 0, 0, 400);
-            gradientHum.addColorStop(0, "rgba(54, 162, 235, 0.8)");
-            gradientHum.addColorStop(1, "rgba(54, 162, 235, 0.2)");
-
             if (!chartInstance) {
-                console.log("📊 Criando gráfico...");
                 chartInstance = new Chart(ctx, {
                     type: "line",
                     data: {
@@ -83,18 +70,36 @@
                                 label: "Temperatura Média (°C)",
                                 data: data.temperature_means,
                                 borderColor: "rgba(255, 99, 132, 1)",
-                                backgroundColor: gradientTemp,
+                                backgroundColor: "rgba(255, 99, 132, 0.2)",
                                 borderWidth: 2,
-                                fill: true,
-                                tension: 0.4, // Linhas suaves
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Amplitude Temperatura (°C)",
+                                data: data.temperature_ranges,
+                                borderColor: "rgba(255, 165, 0, 1)",
+                                backgroundColor: "rgba(255, 165, 0, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
                             },
                             {
                                 label: "Umidade Média (%)",
                                 data: data.humidity_means,
                                 borderColor: "rgba(54, 162, 235, 1)",
-                                backgroundColor: gradientHum,
+                                backgroundColor: "rgba(54, 162, 235, 0.2)",
                                 borderWidth: 2,
-                                fill: true,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Amplitude Umidade (%)",
+                                data: data.humidity_ranges,
+                                borderColor: "rgba(75, 192, 192, 1)",
+                                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
                                 tension: 0.4,
                             }
                         ]
@@ -102,13 +107,6 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: {
-                            duration: 1000, // Animação suave ao atualizar
-                            easing: "easeInOutQuad"
-                        },
-                        layout: {
-                            padding: 40
-                        },
                         scales: {
                             x: {
                                 title: {
@@ -128,29 +126,15 @@
                                 },
                                 ticks: { color: "#555" }
                             }
-                        },
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    font: { size: 14 },
-                                    color: "#333"
-                                }
-                            },
-                            tooltip: {
-                                backgroundColor: "rgba(0, 0, 0, 0.7)",
-                                titleFont: { size: 14, weight: "bold" },
-                                bodyFont: { size: 12 },
-                                padding: 10,
-                                cornerRadius: 5
-                            }
                         }
                     }
                 });
             } else {
-                console.log("🔄 Atualizando gráfico...");
                 chartInstance.data.labels = data.timestamps;
                 chartInstance.data.datasets[0].data = data.temperature_means;
-                chartInstance.data.datasets[1].data = data.humidity_means;
+                chartInstance.data.datasets[1].data = data.temperature_ranges;
+                chartInstance.data.datasets[2].data = data.humidity_means;
+                chartInstance.data.datasets[3].data = data.humidity_ranges;
                 chartInstance.update();
             }
         }

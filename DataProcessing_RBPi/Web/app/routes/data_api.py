@@ -5,10 +5,13 @@ router = APIRouter()
 
 class ProcessedData(BaseModel):
     temperature_mean: float
-    temperature_stdev: float
+    temperature_range: float  # Novo campo
     humidity_mean: float
+    humidity_range: float  # Novo campo
+    temperature_stdev: float
     humidity_stdev: float
     timestamp: str
+
 
 received_data = []
 active_connections = set()  # Lista de conexões WebSocket ativas
@@ -37,7 +40,13 @@ async def broadcast_data():
     data_json = {
         "timestamps": [entry["timestamp"] for entry in received_data],
         "temperature_means": [entry["temperature_mean"] for entry in received_data],
-        "humidity_means": [entry["humidity_mean"] for entry in received_data]
+        "temperature_ranges": [entry["temperature_range"] for entry in received_data],  # Novo campo
+        "humidity_means": [entry["humidity_mean"] for entry in received_data],
+        "humidity_ranges": [entry["humidity_range"] for entry in received_data],  # Novo campo
+        "temperature_stdevs": [entry["temperature_stdev"] for entry in received_data],
+        "humidity_stdevs": [entry["humidity_stdev"] for entry in received_data]
+
+
     }
 
     for connection in active_connections:
@@ -45,6 +54,7 @@ async def broadcast_data():
             await connection.send_json(data_json)
         except:
             active_connections.remove(connection)  # Remove conexões quebradas
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
