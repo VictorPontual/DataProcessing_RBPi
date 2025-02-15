@@ -22,6 +22,10 @@ def process_data(data):
             "humidity_li": None,
             "temp_cp" : None,
             "humidity_cp" : None,
+            "temp_ck" : None,
+            "humidity_ck" : None,
+            "temp_resultados": None,
+            "humidity_resultados": None
 
         }
 
@@ -37,8 +41,8 @@ def process_data(data):
         temp_ls = round(temp_mean + 2 * temp_stdev , 2)
         temp_li = round(temp_mean - 2 * temp_stdev , 2)
         temp_cp = round((temp_ls - temp_li)/6*temp_stdev, 2)
-        temp_cp = round(min((temp_ls - temp_mean) / 3 * temp_stdev , (temp_mean - temp_li) / 3 * temp_stdev) , 2)
-
+        temp_ck = round(min((temp_ls - temp_mean) / 3 * temp_stdev , (temp_mean - temp_li) / 3 * temp_stdev) , 2)
+        temp_resultados = ler_e_comparar_csv(temp_ls,temp_li,'temperature')
 
 
         humidity_mean = round(statistics.mean(humidities), 2)
@@ -47,8 +51,8 @@ def process_data(data):
         humidity_ls = round(humidity_mean + 2 * humidity_stdev , 2)
         humidity_li = round(humidity_mean - 2 * humidity_stdev , 2)
         humidity_cp = round((humidity_ls - humidity_li)/6*humidity_stdev, 2)
-        humidity_cp = round(min((humidity_ls - humidity_mean) / 3 * humidity_stdev , (humidity_mean - humidity_li) / 3 * humidity_stdev) , 2)
-
+        humidity_ck = round(min((humidity_ls - humidity_mean) / 3 * humidity_stdev , (humidity_mean - humidity_li) / 3 * humidity_stdev) , 2)
+        humidity_resultados = ler_e_comparar_csv(humidity_ls,humidity_li,'humidity')
 
         
         timestamp = get_timestamp()
@@ -68,6 +72,10 @@ def process_data(data):
             "humidity_li": None,
             "temp_cp" : None,
             "humidity_cp" : None,
+            "temp_ck" : None,
+            "humidity_ck" : None,
+            "temp_resultados": None,
+            "humidity_resultados": None
 
         }
 
@@ -86,5 +94,37 @@ def process_data(data):
         "humidity_li": humidity_li,
         "temp_cp" : temp_cp,
         "humidity_cp" : humidity_cp,
+        "temp_ck" : temp_ck,
+        "humidity_ck" : humidity_ck,
+        "temp_resultados": temp_resultados,
+        "humidity_resultados": humidity_resultados
 
     }
+
+import os
+import csv
+
+def ler_e_comparar_csv(ls, li, type):
+    caminho_arquivo = "data_batches"
+    
+    # Encontrando o arquivo mais recente no diretório
+    arquivos = os.listdir(caminho_arquivo)
+    arquivos_completo = [os.path.join(caminho_arquivo, arq) for arq in arquivos]
+    
+    # Pegando o arquivo mais recente
+    arquivo_mais_recente = max(arquivos_completo, key=os.path.getmtime)
+
+    # Lendo os dados do arquivo CSV
+    data = []
+    resultados = []
+
+    with open(arquivo_mais_recente, mode='r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            data.append(float(row[type]))
+    # Comparando os dados com os limites
+    for dad in data:
+        if not (li <= dad <= ls):
+            resultados.append(dad)
+    print(resultados)
+    return resultados

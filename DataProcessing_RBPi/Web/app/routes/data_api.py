@@ -1,16 +1,27 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+from typing import List
 
 router = APIRouter()
 
 class ProcessedData(BaseModel):
     temperature_mean: float
-    temperature_range: float  # Novo campo
+    temperature_range: float
     humidity_mean: float
-    humidity_range: float  # Novo campo
+    humidity_range: float
     temperature_stdev: float
     humidity_stdev: float
     timestamp: str
+    temp_ls: float  # Limite superior da temperatura
+    humidity_ls: float  # Limite superior da umidade
+    temp_li: float  # Limite inferior da temperatura
+    humidity_li: float  # Limite inferior da umidade
+    temp_cp: float  # Flag de controle de qualidade para temperatura
+    humidity_cp: float  # Flag de controle de qualidade para umidade
+    temp_ck: float  # Flag de controle de qualidade para temperatura
+    humidity_ck: float  # Flag de controle de qualidade para umidade
+    temp_resultados: List[float]
+    humidity_resultados: List[float]
 
 
 received_data = []
@@ -44,10 +55,20 @@ async def broadcast_data():
         "humidity_means": [entry["humidity_mean"] for entry in received_data],
         "humidity_ranges": [entry["humidity_range"] for entry in received_data],  # Novo campo
         "temperature_stdevs": [entry["temperature_stdev"] for entry in received_data],
-        "humidity_stdevs": [entry["humidity_stdev"] for entry in received_data]
-
+        "humidity_stdevs": [entry["humidity_stdev"] for entry in received_data],
+        "temp_ls": [entry["temp_ls"] for entry in received_data],  # Limite superior da temperatura
+        "humidity_ls": [entry["humidity_ls"] for entry in received_data],  # Limite superior da umidade
+        "temp_li": [entry["temp_li"] for entry in received_data],  # Limite inferior da temperatura
+        "humidity_li": [entry["humidity_li"] for entry in received_data],  # Limite inferior da umidade
+        "temp_cp": [entry["temp_cp"] for entry in received_data],  # Controle de qualidade para temperatura
+        "humidity_cp": [entry["humidity_cp"] for entry in received_data],  # Controle de qualidade para umidade
+        "temp_ck": [entry["temp_ck"] for entry in received_data],  # Controle de qualidade para temperatura
+        "humidity_ck": [entry["humidity_ck"] for entry in received_data],  # Controle de qualidade para umidade
+        "temp_resultados": [entry["temp_resultados"] for entry in received_data],  # Controle de qualidade para umidade
+        "humidity_resultados": [entry["humidity_resultados"] for entry in received_data]
 
     }
+
 
     for connection in active_connections:
         try:

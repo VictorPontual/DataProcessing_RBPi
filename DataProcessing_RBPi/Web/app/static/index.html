@@ -29,6 +29,9 @@
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
         }
+        .chart-container {
+            margin-bottom: 30px;
+        }
         canvas {
             max-width: 100%;
             height: 500px;
@@ -40,28 +43,78 @@
         Monitoramento de Sensores com WebSocket
     </header>
     <main>
-        <canvas id="sensorChart"></canvas>
+        <!-- Divs para separar os gráficos -->
+        <div class="chart-container" id="tempChartContainer">
+            <canvas id="tempChart"></canvas>
+        </div>
+        <div class="chart-container" id="humidityChartContainer">
+            <canvas id="humidityChart"></canvas>
+        </div>
     </main>
     <script>
         let chartInstance = null;
-        const ws = new WebSocket("ws://127.0.0.1:8000/api/ws");
-
-        ws.onopen = () => console.log("✅ Conectado ao WebSocket!");
+        let chartInstance2 = null;
+        let batchCount = 0;  // Contador para os batches
+        let limitsUpdate = false;  // Flag para saber se os limites foram atualizados
+        let firstDataReceived = false;  // Flag para saber se é o primeiro dado recebido
+        let fixedTempLS = null, fixedTempLI = null, fixedHumidityLS = null, fixedHumidityLI = null;  // Variáveis para armazenar os limites fixos
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const ws = new WebSocket(protocol + window.location.host + "/api/ws");
+    
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             console.log("📡 Dados recebidos:", data);
-            console.log("Desv. Padr. Umidade:", data.humidity_stdev);
-            console.log("Desv. Padr. Temp:", data.temperature_stdev);
 
-            updateChart(data);
+            // Aumentar o contador de batches
+            batchCount++;
+
+            // Depois de 5 batches, calcular a média e substituir os limites, uma única vez
+            if (batchCount >= 3 && !limitsUpdate) {
+                fixedTempLS = average(data.temp_ls);
+                fixedTempLI = average(data.temp_li);
+                fixedHumidityLS = average(data.humidity_ls);
+                fixedHumidityLI = average(data.humidity_li);
+
+                console.log("Novos limites médios calculados:");
+                console.log("Limite Superior Temperatura (LS):", fixedTempLS);
+                console.log("Limite Inferior Temperatura (LI):", fixedTempLI);
+                console.log("Limite Superior Umidade (LS):", fixedHumidityLS);
+                console.log("Limite Inferior Umidade (LI):", fixedHumidityLI);
+                console.log("temp_ck:", data.temp_ck);
+                console.log("humidity_ck:", data.humidity_ck);
+
+                // Marcar como limites atualizados
+                limitsUpdate = true;
+            }
+            updateCharts(data);
         };
         ws.onclose = () => console.log("❌ Conexão WebSocket fechada.");
+    
+        function average(array) {
+            let soma = 0;
+            for(let i = 0; i < array.length; i++){
+                soma += array[i]    
+            }
+            let media = soma / array.length
+            console.log("MEDIA AI:", media)
+            return media
+        }
 
-        function updateChart(data) {
-            const ctx = document.getElementById("sensorChart").getContext("2d");
+        function updateCharts(data) {
+            // Se for o primeiro dado, salvar os limites fixos
+            if (!firstDataReceived) {
+                fixedTempLS = data.temp_ls[0];
+                fixedTempLI = data.temp_li[0];
+                fixedHumidityLS = data.humidity_ls[0];
+                fixedHumidityLI = data.humidity_li[0];
+                firstDataReceived = true;  // Agora podemos considerar que o primeiro dado foi recebido
+            }
 
+            // Gráfico para Temperatura
+            const tempCtx = document.getElementById("tempChart").getContext("2d");
+    
             if (!chartInstance) {
-                chartInstance = new Chart(ctx, {
+                chartInstance = new Chart(tempCtx, {
                     type: "line",
                     data: {
                         labels: data.timestamps,
@@ -85,22 +138,69 @@
                                 tension: 0.4,
                             },
                             {
-                                label: "Umidade Média (%)",
-                                data: data.humidity_means,
-                                borderColor: "rgba(54, 162, 235, 1)",
-                                backgroundColor: "rgba(54, 162, 235, 0.2)",
-                                borderWidth: 2,
+                                label: "Limite Superior Temperatura (°C)",
+                                data: new Array(data.timestamps.length).fill(fixedTempLS),  // Usar o limite fixo para todos os pontos
+                                borderColor: "rgba(255, 99, 132, 0.7)",
+                                backgroundColor: "rgba(255, 99, 132, 0.1)",
+                                borderWidth: 1,
                                 fill: false,
                                 tension: 0.4,
+                                borderDash: [5, 5]
                             },
                             {
-                                label: "Amplitude Umidade (%)",
-                                data: data.humidity_ranges,
-                                borderColor: "rgba(75, 192, 192, 1)",
-                                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                                label: "Limite Inferior Temperatura (°C)",
+                                data: new Array(data.timestamps.length).fill(fixedTempLI),  // Usar o limite fixo para todos os pontos
+                                borderColor: "rgba(255, 99, 132, 0.7)",
+                                backgroundColor: "rgba(255, 99, 132, 0.1)",
+                                borderWidth: 1,
+                                fill: false,
+                                tension: 0.4,
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: "Cp Temperatura",
+                                data: data.temp_cp,  // CP da Temperatura
+                                borderColor: "rgba(255, 159, 64, 1)",
+                                backgroundColor: "rgba(255, 159, 64, 0.2)",
                                 borderWidth: 2,
                                 fill: false,
                                 tension: 0.4,
+                                pointRadius: 5
+                            },
+                            {
+                                label: "Cpk Temperatura",
+                                data: data.temp_ck,  // CPK da Temperatura
+                                borderColor: "rgba(153, 102, 255, 1)",
+                                backgroundColor: "rgba(153, 102, 255, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 5
+                            },
+                            {
+                                label: "Desvio Padrão Temperatura",
+                                data: data.temperature_stdevs,  // Desvio padrão de Temperatura
+                                borderColor: "rgba(69, 69, 420, 1)",
+                                backgroundColor: "rgba(69, 69, 420, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 5
+                            },
+                             // Outliers para Temperatura
+                            {
+                                label: "Outliers Temperatura",
+                                data: data.temp_resultados.map((outlier, index) => ({
+                                    x: data.timestamps[index],  // Associando cada outlier ao seu timestamp
+                                    y: outlier
+                                })),
+                                borderColor: "rgba(255, 0, 0, 1)",  // Cor para os outliers
+                                backgroundColor: "rgba(255, 0, 0, 0.5)",
+                                borderWidth: 2,
+                                fill: false,
+                                showLine: false,
+                                pointRadius: 7, // Tamanho maior para destacar os outliers
+                                pointStyle: "rectRot", // Estilo diferente para os outliers
                             }
                         ]
                     },
@@ -120,7 +220,7 @@
                             y: {
                                 title: {
                                     display: true,
-                                    text: "Valores",
+                                    text: "Temperatura (°C)",
                                     font: { size: 14, weight: "bold" },
                                     color: "#333"
                                 },
@@ -133,11 +233,134 @@
                 chartInstance.data.labels = data.timestamps;
                 chartInstance.data.datasets[0].data = data.temperature_means;
                 chartInstance.data.datasets[1].data = data.temperature_ranges;
-                chartInstance.data.datasets[2].data = data.humidity_means;
-                chartInstance.data.datasets[3].data = data.humidity_ranges;
+                chartInstance.data.datasets[2].data = new Array(data.timestamps.length).fill(fixedTempLS);
+                chartInstance.data.datasets[3].data = new Array(data.timestamps.length).fill(fixedTempLI);
+                chartInstance.data.datasets[4].data = data.temp_cp;
+                chartInstance.data.datasets[5].data = data.temp_ck;
+                chartInstance.data.datasets[6].data = data.temperature_stdevs;
+                chartInstance.data.datasets[7].data = data.temp_resultados.map((outlier, index) => ({
+                    x: data.timestamps[index],  // Associando cada outlier ao seu timestamp
+                    y: outlier
+                }));  // Atualizando com os outliers de temperatura
                 chartInstance.update();
             }
+    
+            // Gráfico para Umidade
+            const humidityCtx = document.getElementById("humidityChart").getContext("2d");
+    
+            if (!chartInstance2) {
+                chartInstance2 = new Chart(humidityCtx, {
+                    type: "line",
+                    data: {
+                        labels: data.timestamps,
+                        datasets: [
+                            {
+                                label: "Umidade Média (%)",
+                                data: data.humidity_means,
+                                borderColor: "rgba(54, 162, 235, 1)",
+                                backgroundColor: "rgba(54, 162, 235, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Amplitude Umidade (%)",
+                                data: data.humidity_ranges,
+                                borderColor: "rgba(75, 192, 192, 1)",
+                                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Limite Superior Umidade (%)",
+                                data: new Array(data.timestamps.length).fill(fixedHumidityLS),  // Usar o limite fixo para todos os pontos
+                                borderColor: "rgba(54, 162, 235, 0.7)",
+                                backgroundColor: "rgba(54, 162, 235, 0.1)",
+                                borderWidth: 1,
+                                fill: false,
+                                tension: 0.4,
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: "Limite Inferior Umidade (%)",
+                                data: new Array(data.timestamps.length).fill(fixedHumidityLI),  // Usar o limite fixo para todos os pontos
+                                borderColor: "rgba(54, 162, 235, 0.7)",
+                                backgroundColor: "rgba(54, 162, 235, 0.1)",
+                                borderWidth: 1,
+                                fill: false,
+                                tension: 0.4,
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: "Cp Umidade",
+                                data: data.humidity_cp,  // CP da Umidade
+                                borderColor: "rgba(255, 159, 64, 1)",
+                                backgroundColor: "rgba(255, 159, 64, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 5
+                            },
+                            {
+                                label: "Cpk Umidade",
+                                data: data.humidity_ck,  // CPK da Umidade
+                                borderColor: "rgba(153, 102, 255, 1)",
+                                backgroundColor: "rgba(153, 102, 255, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 5
+                            },
+                            {
+                                label: "Desvio Padrão Umidade",
+                                data: data.humidity_stdevs,  // Desvio padrão de Umidade
+                                borderColor: "rgba(69, 69, 420, 1)",
+                                backgroundColor: "rgba(69, 69, 420, 0.2)",
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 5
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: "Tempo",
+                                    font: { size: 14, weight: "bold" },
+                                    color: "#333"
+                                },
+                                ticks: { color: "#555" }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: "Umidade (%)",
+                                    font: { size: 14, weight: "bold" },
+                                    color: "#333"
+                                },
+                                ticks: { color: "#555" }
+                            }
+                        }
+                    }
+                });
+            } else {
+                chartInstance2.data.labels = data.timestamps;
+                chartInstance2.data.datasets[0].data = data.humidity_means;
+                chartInstance2.data.datasets[1].data = data.humidity_ranges;
+                chartInstance2.data.datasets[2].data = new Array(data.timestamps.length).fill(fixedHumidityLS);
+                chartInstance2.data.datasets[3].data = new Array(data.timestamps.length).fill(fixedHumidityLI);
+                chartInstance2.data.datasets[4].data = data.humidity_cp;
+                chartInstance2.data.datasets[5].data = data.humidity_ck;
+                chartInstance2.data.datasets[6].data = data.humidity_stdevs;
+                chartInstance2.update();
+            }
         }
-    </script>
+    </script>            
 </body>
 </html>

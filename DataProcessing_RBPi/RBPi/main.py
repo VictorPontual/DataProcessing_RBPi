@@ -21,6 +21,9 @@ def main():
         
         # Se o número de leituras atingir o limite do lote, salva os dados e envia
         if len(data_batch) >= BATCH_SIZE:
+            # Salva os dados em um arquivo CSV
+            save_to_csv(data_batch)
+            
             # Processa os dados do lote
             processed_data = process_data(data_batch)
             print(f"Dados processados: {processed_data}")
@@ -28,8 +31,7 @@ def main():
             # Envia os dados para o servidor
             send_data_to_server(processed_data)
 
-            # Salva os dados em um arquivo CSV
-            save_to_csv(data_batch)
+            
 
             # Limpa o lote de dados
             data_batch = []
