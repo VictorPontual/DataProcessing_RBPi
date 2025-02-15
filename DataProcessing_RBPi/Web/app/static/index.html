@@ -86,10 +86,42 @@
                 // Marcar como limites atualizados
                 limitsUpdate = true;
             }
+            filterTempResultsOutOfRange(data)
+            filterHumidityResultsOutOfRange(data)
             updateCharts(data);
         };
         ws.onclose = () => console.log("❌ Conexão WebSocket fechada.");
-    
+        
+        function filterTempResultsOutOfRange(data) {
+            // Verifica se fixedTempLS e fixedTempLI já estão definidos
+            if (fixedTempLS !== null && fixedTempLI !== null) {
+                // Filtra os valores que estão fora do intervalo
+                data.temp_resultados = data.temp_resultados.filter(temp => {
+                    return temp < fixedTempLI || temp > fixedTempLS;  // Mantém apenas os valores fora do intervalo
+                });
+
+                console.log("Valores de temperatura fora do intervalo:", data.temp_resultados);
+            } else {
+                console.log("Limites fixos de temperatura ainda não definidos.");
+            }
+        }
+
+        function filterHumidityResultsOutOfRange(data) {
+            // Verifica se fixedTempLS e fixedTempLI já estão definidos
+            if (fixedHumidityLS !== null && fixedHumidityLI !== null) {
+                // Filtra os valores que estão fora do intervalo
+                data.humidity_resultados = data.humidity_resultados.filter(temp => {
+                    return temp < fixedHumidityLI || temp > fixedHumidityLS;  // Mantém apenas os valores fora do intervalo
+                });
+
+                console.log("Valores de temperatura fora do intervalo:", data.humidity_resultados);
+            } else {
+                console.log("Limites fixos de temperatura ainda não definidos.");
+            }
+        }
+
+
+
         function average(array) {
             let soma = 0;
             for(let i = 0; i < array.length; i++){
@@ -321,6 +353,20 @@
                                 fill: false,
                                 tension: 0.4,
                                 pointRadius: 5
+                            },
+                            {
+                                label: "Outliers Umidade",
+                                data: data.humidity_resultados.map((outlier, index) => ({
+                                    x: data.timestamps[index],  // Associando cada outlier ao seu timestamp
+                                    y: outlier
+                                })),
+                                borderColor: "rgba(255, 0, 0, 1)",  // Cor para os outliers
+                                backgroundColor: "rgba(255, 0, 0, 0.5)",
+                                borderWidth: 2,
+                                fill: false,
+                                showLine: false,
+                                pointRadius: 7, // Tamanho maior para destacar os outliers
+                                pointStyle: "rectRot", // Estilo diferente para os outliers
                             }
                         ]
                     },
@@ -358,6 +404,10 @@
                 chartInstance2.data.datasets[4].data = data.humidity_cp;
                 chartInstance2.data.datasets[5].data = data.humidity_ck;
                 chartInstance2.data.datasets[6].data = data.humidity_stdevs;
+                chartInstance2.data.datasets[7].data = data.humidity_resultados.map((outlier, index) => ({
+                    x: data.timestamps[index],  // Associando cada outlier ao seu timestamp
+                    y: outlier
+                }));
                 chartInstance2.update();
             }
         }
