@@ -5,53 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoramento de Sensores</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Domine:wght@400..700&family=Fauna+One&family=Yrsa:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: "Arial", sans-serif;
             text-align: center;
             margin: 20px;
-            background-color: #eef2f3;
+            background-color: #E4ECF1;
         }
 
         header {
-            background: linear-gradient(90deg, #007BFF, #0056b3);
+            background: #2F4858;
             color: white;
-            padding: 15px;
-            font-size: 1.5em;
-            font-weight: bold;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 3rem;
+            font-size: 2.5rem;
+            text-align: center;
+            font-family: "Fauna One", serif;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            margin-bottom: 20px;  /* Ajuste para evitar o deslocamento excessivo */
         }
 
         main {
-            max-width: 900px;
-            margin: 20px auto;
+            max-width: 1200px;
+            margin: auto;
             padding: 20px;
             background: white;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
+            font-family: "Domine", serif;
+            margin-top: 60px;
         }
 
         canvas {
-            max-width: 100%;
-            height: 500px;
+            width: 100% !important; /* Força o canvas a se ajustar à largura do contêiner */
+            height: 400px !important; /* Ajuste a altura do gráfico para 400px ou o valor desejado */
+            display: block;
+            margin: 0 auto;
         }
     </style>
 </head>
 <body>
     <header>
-        Monitoramento de Sensores com WebSocket
+        Gráficos de Controle
     </header>
 
+    <main style="margin-top: 200px;">
+        <!-- Gráfico X (média) -->
+        <div>
+            <h1>Gráfico X</h1>
+            <canvas id="sensorChartX"></canvas>
+        </div>
+    </main>
     <main>
-        <canvas id="sensorChart"></canvas>
+        <!-- Gráfico R (variabilidade) -->
+        <div>
+            <h1>Gráfico R</h1>
+            <canvas id="sensorChartR"></canvas>
+        </div>
+    </main>
+    <main style="margin-bottom: 200px;">
+        <!-- Gráfico R (variabilidade) -->
+        <div>
+            <h1>Gráfico S</h1>
+            <canvas id="sensorChartS"></canvas>
+        </div>
     </main>
 
     <script>
-        let chartInstance = null;
-        const ws = new WebSocket("ws://127.0.0.1:8000/api/ws");
+        let chartInstanceX = null;  // Instância para o gráfico X (média)
+        let chartInstanceR = null;  // Instância para o gráfico R (variabilidade)
+        let chartInstanceS = null;  // Instância para o gráfico S (desvio padrão)
 
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const ws = new WebSocket(protocol + window.location.host + "/api/ws");
+    
         ws.onopen = () => console.log("✅ Conectado ao WebSocket!");
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -59,62 +92,156 @@
             updateChart(data);
         };
         ws.onclose = () => console.log("❌ Conexão WebSocket fechada.");
-
+    
         function updateChart(data) {
-            const ctx = document.getElementById("sensorChart").getContext("2d");
-
-            // Gradiente de cor para o gráfico
-            let gradientTemp = ctx.createLinearGradient(0, 0, 0, 400);
-            gradientTemp.addColorStop(0, "rgba(255, 99, 132, 0.8)");
-            gradientTemp.addColorStop(1, "rgba(255, 99, 132, 0.2)");
-
-            let gradientHum = ctx.createLinearGradient(0, 0, 0, 400);
-            gradientHum.addColorStop(0, "rgba(54, 162, 235, 0.8)");
-            gradientHum.addColorStop(1, "rgba(54, 162, 235, 0.2)");
-
-            if (!chartInstance) {
-                console.log("📊 Criando gráfico...");
-                chartInstance = new Chart(ctx, {
+            const ctxX = document.getElementById("sensorChartX").getContext("2d");
+    
+            if (!chartInstanceX) {
+                console.log("📊 Criando gráfico X...");
+                chartInstanceX = new Chart(ctxX, {
                     type: "line",
                     data: {
                         labels: data.timestamps,
                         datasets: [
-                            {
-                                label: "Temperatura Média (°C)",
-                                data: data.temperature_means,
-                                borderColor: "rgba(255, 99, 132, 1)",
-                                backgroundColor: gradientTemp,
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4, // Linhas suaves
-                            },
-                            {
-                                label: "Umidade Média (%)",
-                                data: data.humidity_means,
-                                borderColor: "rgba(54, 162, 235, 1)",
-                                backgroundColor: gradientHum,
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4,
-                            }
+                        {
+                            label: "Temperatura Média (°C)",
+                            data: data.temperature_means,
+                            borderColor: "#FF5733",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Umidade Média (%)",
+                            data: data.humidity_means,
+                            borderColor: "#33A1FF",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },                        {
+                            label: "Limite Superior: Temperatura",
+                            data: data.temperature_lss,
+                            borderColor: "#1ABC9C",
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Limite Inferior: Temperatura",
+                            data: data.temperature_lis,
+                            borderColor: "#BDC3C7",
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Limite Superior: Umidade",
+                            data: data.humidity_lss,
+                            borderColor: "#3498DB",
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Limite Inferior: Umidade",
+                            data: data.humidity_lis,
+                            borderColor: "#2C3E50",
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Índ. Cap. Processo: Temperatura",
+                            data: data.temperature_cps,
+                            borderColor: "#F39C12",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Índ. Cap. Processo: Umidade",
+                            data: data.humidity_cps,
+                            borderColor: "#F4D03F",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Índ. Cap. Processo Ajustado: Temperatura",
+                            data: data.cpks_temperature,
+                            borderColor: "#2ECC71",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Índ. Cap. Processo Ajustado: Umidade",
+                            data: data.cpks_humidity,
+                            borderColor: "#34495E",
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                        },
+                        {
+                            label: "Outliers: Temperatura",
+                            data: data.temperature_outliers, // Dados de outliers de temperatura
+                            borderColor: "#FF0000", // Cor vermelha para os outliers
+                            backgroundColor: "#FF0000", // Cor vermelha para os pontos
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointStyle: 'circle',
+                            pointRadius: 5, // Aumenta o tamanho dos pontos para destacar
+                        },
+                        {
+                            label: "Outliers: Umidade",
+                            data: data.humidity_outliers, // Dados de outliers de umidade
+                            borderColor: "#FF4500", // Cor laranja para os outliers
+                            backgroundColor: "#FF4500", // Cor laranja para os pontos
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointStyle: 'circle',
+                            pointRadius: 5, // Aumenta o tamanho dos pontos para destacar
+                        },
+                        {
+                            label: "Deslocamento de Média: Temperatura",
+                            data: data.temperature_mean_shift,
+                            borderColor: "#3498DB",
+                            backgroundColor: "#3498DB",
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointStyle: 'circle',
+                            pointRadius: 5,
+                        },
+                        {
+                            label: "Deslocamento de Média: Umidade",
+                            data: data.humidity_mean_shift,
+                            borderColor: "#1ABC9C",
+                            backgroundColor: "#1ABC9C",
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointStyle: 'circle',
+                            pointRadius: 5,
+                        },
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: {
-                            duration: 1000, // Animação suave ao atualizar
-                            easing: "easeInOutQuad"
-                        },
-                        layout: {
-                            padding: 40
-                        },
+                        layout: { padding: 20 },
                         scales: {
                             x: {
                                 title: {
                                     display: true,
                                     text: "Tempo",
-                                    font: { size: 14, weight: "bold" },
+                                    font: { family: "Montserrat", size: 16, weight: "bold" },
                                     color: "#333"
                                 },
                                 ticks: { color: "#555" }
@@ -123,35 +250,175 @@
                                 title: {
                                     display: true,
                                     text: "Valores",
-                                    font: { size: 14, weight: "bold" },
+                                    font: { family: "Montserrat", size: 16, weight: "bold" },
                                     color: "#333"
                                 },
-                                ticks: { color: "#555" }
+                                ticks: { color: "#555" },
                             }
                         },
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    font: { size: 14 },
-                                    color: "#333"
-                                }
-                            },
-                            tooltip: {
-                                backgroundColor: "rgba(0, 0, 0, 0.7)",
-                                titleFont: { size: 14, weight: "bold" },
-                                bodyFont: { size: 12 },
-                                padding: 10,
-                                cornerRadius: 5
-                            }
-                        }
                     }
                 });
             } else {
-                console.log("🔄 Atualizando gráfico...");
-                chartInstance.data.labels = data.timestamps;
-                chartInstance.data.datasets[0].data = data.temperature_means;
-                chartInstance.data.datasets[1].data = data.humidity_means;
-                chartInstance.update();
+                console.log("🔄 Atualizando gráfico X...");
+                chartInstanceX.data.labels = data.timestamps;
+                chartInstanceX.data.datasets[0].data = data.temperature_means;
+                chartInstanceX.data.datasets[1].data = data.humidity_means;
+                chartInstanceX.data.datasets[2].data = data.temperature_lss;
+                chartInstanceX.data.datasets[3].data = data.temperature_lis;
+                chartInstanceX.data.datasets[4].data = data.humidity_lss;
+                chartInstanceX.data.datasets[5].data = data.humidity_lis;
+                chartInstanceX.data.datasets[6].data = data.temperature_cps;
+                chartInstanceX.data.datasets[7].data = data.humidity_cps;
+                chartInstanceX.data.datasets[8].data = data.cpks_temperature;
+                chartInstanceX.data.datasets[9].data = data.cpks_humidity;
+                chartInstanceX.data.datasets[10].data = data.temperature_outliers  || [];
+                chartInstanceX.data.datasets[11].data = data.humidity_outliers  || [];
+                chartInstanceX.update();
+                chartInstanceX.data.datasets[12].data = data.temperature_mean_shift;
+                chartInstanceX.data.datasets[13].data = data.humidity_mean_shift;
+            }
+
+            const ctxR = document.getElementById("sensorChartR").getContext("2d");
+
+            if (!chartInstanceR) {
+                console.log("📊 Criando gráfico R...");
+                chartInstanceR = new Chart(ctxR, {
+                    type: "line",
+                    data: {
+                        labels: data.timestamps,
+                        datasets: [
+                            {
+                                label: "Altura: Temperatura",
+                                data: data.temperature_ranges,
+                                borderColor: "#FF5733",
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Altura: Umidade",
+                                data: data.humidity_ranges,
+                                borderColor: "#33A1FF",
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Lim. Controle Sup.: Temperatura",
+                                data: data.ucls_temperature,
+                                borderColor: "#2ECC71",
+                                borderDash: [5, 5],
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Lim. Controle Inf.: Temperatura",
+                                data: data.lcls_temperature,
+                                borderColor: "#F4D03F",
+                                borderDash: [5, 5],
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Lim. Controle Sup.: Umidade",
+                                data: data.ucls_humidity,
+                                borderColor: "#F39C12",
+                                borderDash: [5, 5],
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Lim. Controle Inf.: Umidade",
+                                data: data.lcls_humidity,
+                                borderColor: "#BDC3C7",
+                                borderDash: [5, 5],
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: 20 },
+                        scales: {
+                            x: {
+                                title: { display: true, text: "Tempo", font: { family: "Montserrat", size: 16, weight: "bold" }, color: "#333" },
+                                ticks: { color: "#555" }
+                            },
+                            y: {
+                                title: { display: true, text: "Range", font: { family: "Montserrat", size: 16, weight: "bold" }, color: "#333" },
+                                ticks: { color: "#555" }
+                            }
+                        },
+                    }
+                });
+            } else {
+                console.log("🔄 Atualizando gráfico R...");
+                chartInstanceR.data.labels = data.timestamps;
+                chartInstanceR.data.datasets[0].data = data.temperature_ranges;
+                chartInstanceR.data.datasets[1].data = data.humidity_ranges;
+                chartInstanceR.data.datasets[2].data = data.ucls_temperature;
+                chartInstanceR.data.datasets[3].data = data.lcls_temperature;
+                chartInstanceR.data.datasets[4].data = data.ucls_humidity;
+                chartInstanceR.data.datasets[5].data = data.lcls_humidity;
+                chartInstanceR.update();
+            }
+
+            // Para o gráfico S (desvio padrão)
+            const ctxS = document.getElementById("sensorChartS").getContext("2d");
+
+            if (!chartInstanceS) {
+                console.log("📊 Criando gráfico S...");
+                chartInstanceS = new Chart(ctxS, {
+                    type: "line",
+                    data: {
+                        labels: data.timestamps,
+                        datasets: [
+                            {
+                                label: "Desvio Padrão: Temperatura",
+                                data: data.temperature_stdevs,
+                                borderColor: "#FF6F00",
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            },
+                            {
+                                label: "Desvio Padrão: Umidade",
+                                data: data.humidity_stdevs,
+                                borderColor: "#9B59B6",
+                                borderWidth: 3,
+                                fill: false,
+                                tension: 0.4,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: 20 },
+                        scales: {
+                            x: {
+                                title: { display: true, text: "Tempo", font: { family: "Montserrat", size: 16, weight: "bold" }, color: "#333" },
+                                ticks: { color: "#555" }
+                            },
+                            y: {
+                                title: { display: true, text: "Desvio Padrão", font: { family: "Montserrat", size: 16, weight: "bold" }, color: "#333" },
+                                ticks: { color: "#555" }
+                            }
+                        },
+                    }
+                });
+            } else {
+                console.log("🔄 Atualizando gráfico S...");
+                chartInstanceS.data.labels = data.timestamps;
+                chartInstanceS.data.datasets[0].data = data.temperature_stdevs;
+                chartInstanceS.data.datasets[1].data = data.humidity_stdevs;
+                chartInstanceS.update();
             }
         }
     </script>
