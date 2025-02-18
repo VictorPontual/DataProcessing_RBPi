@@ -42,6 +42,20 @@
     <header>
         Monitoramento de Sensores com WebSocket
     </header>
+    <div id="outlier-alert" style="
+        display: none;
+        padding: 10px;
+        background: red;
+        color: white;
+        font-weight: bold;
+        border-radius: 5px;
+        margin: 10px auto;
+        max-width: 600px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    ">
+        ⚠️ Alerta: Outlier identificado!
+    </div>
+
     <main>
         <!-- Divs para separar os gráficos -->
         <div class="chart-container" id="tempChartContainer">
@@ -52,12 +66,19 @@
         </div>
     </main>
     <script>
+        // Conjuntos globais para armazenar outliers e deslocamentos já notificados
+        const notifiedTempOutliers = new Set();
+        const notifiedHumidityOutliers = new Set();
+        const notifiedTempShifts = new Set();
+        const notifiedHumidityShifts = new Set();
+
         let chartInstance = null;
         let chartInstance2 = null;
         let batchCount = 0;  // Contador para os batches
         let limitsUpdate = false;  // Flag para saber se os limites foram atualizados
         let firstDataReceived = false;  // Flag para saber se é o primeiro dado recebido
         let fixedTempLS = null, fixedTempLI = null, fixedHumidityLS = null, fixedHumidityLI = null;  // Variáveis para armazenar os limites fixos
+
         const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         const ws = new WebSocket(protocol + window.location.host + "/api/ws");
     
@@ -99,10 +120,8 @@
                 data.temp_resultados = data.temp_resultados.filter(temp => {
                     return temp < fixedTempLI || temp > fixedTempLS;  // Mantém apenas os valores fora do intervalo
                 });
-
-                console.log("Valores de temperatura fora do intervalo:", data.temp_resultados);
             } else {
-                console.log("Limites fixos de temperatura ainda não definidos.");
+                console.log("Limites fixos de umidade ainda não definidos.");
             }
         }
 
@@ -113,8 +132,6 @@
                 data.humidity_resultados = data.humidity_resultados.filter(temp => {
                     return temp < fixedHumidityLI || temp > fixedHumidityLS;  // Mantém apenas os valores fora do intervalo
                 });
-
-                console.log("Valores de temperatura fora do intervalo:", data.humidity_resultados);
             } else {
                 console.log("Limites fixos de temperatura ainda não definidos.");
             }
@@ -128,7 +145,6 @@
                 soma += array[i]    
             }
             let media = soma / array.length
-            console.log("MEDIA AI:", media)
             return media
         }
 
@@ -141,6 +157,164 @@
                 fixedHumidityLI = data.humidity_li[0];
                 firstDataReceived = true;  // Agora podemos considerar que o primeiro dado foi recebido
             }
+            checkOutliersAndWarn(data);
+            checkWesternElectricRules(data);
+
+            function checkOutliersAndWarn(data) {
+                // Achata os arrays e remove valores 0
+                const tempOutliers = data.temp_resultados.flat().filter(outlier => outlier !== 0);
+                const humidityOutliers = data.humidity_resultados.flat().filter(outlier => outlier !== 0);
+
+                console.log("Outliers filtrados (Temperatura):", tempOutliers);
+                console.log("Outliers filtrados (Umidade):", humidityOutliers);
+
+                // Filtrar apenas outliers ainda não notificados
+                const newTempOutliers = tempOutliers.filter(outlier => !notifiedTempOutliers.has(outlier));
+                const newHumidityOutliers = humidityOutliers.filter(outlier => !notifiedHumidityOutliers.has(outlier));
+
+                // Se houver novos outliers, armazená-los e exibir alerta
+                if (newTempOutliers.length > 0 || newHumidityOutliers.length > 0) {
+                    // Adicionar os novos outliers ao conjunto de notificados
+                    newTempOutliers.forEach(outlier => notifiedTempOutliers.add(outlier));
+                    newHumidityOutliers.forEach(outlier => notifiedHumidityOutliers.add(outlier));
+
+                    // Exibir o alerta
+                    const alertBox = document.getElementById("outlier-alert");
+                    alertBox.style.display = "block";
+
+                    setTimeout(() => {
+                        alertBox.style.display = "none";
+                    }, 5000); // Oculta o alerta após 5 segundos
+                }
+            }
+
+        // 🚨 Verifica regras da Western Electric
+        function checkWesternElectricRules(data) {
+            const n = data.temperature_means.length;
+            const sigmaTemp = data.temperature_stdevs;
+            const sigmaHumidity = data.humidity_stdevs;
+
+            let tempMean = data.temperature_means;
+            let humidityMean = data.humidity_means;
+
+            let avgTemp = average(tempMean);
+            let avgHumidity = average(humidityMean);
+
+            let tempOutliers = [];
+            let humidityOutliers = [];
+            let tempShiftWarnings = [];
+            let humidityShiftWarnings = [];
+
+            for (let i = 0; i < n; i++) {
+                let tempValue = tempMean[i];
+                let humidityValue = humidityMean[i];
+
+                let UCL_3 = avgTemp + 3 * sigmaTemp[i];
+                let LCL_3 = avgTemp - 3 * sigmaTemp[i];
+                let UCL_2 = avgTemp + 2 * sigmaTemp[i];
+                let LCL_2 = avgTemp - 2 * sigmaTemp[i];
+                let UCL_1 = avgTemp + sigmaTemp[i];
+                let LCL_1 = avgTemp - sigmaTemp[i];
+
+                let UCL_3_H = avgHumidity + 3 * sigmaHumidity[i];
+                let LCL_3_H = avgHumidity - 3 * sigmaHumidity[i];
+
+                // 🚨 Regra 1: Um ponto fora de 3σ (outlier crítico), IGNORANDO VALORES = 0
+                if (tempValue !== 0 && (tempValue > UCL_3 || tempValue < LCL_3)) {
+                    tempOutliers.push(tempValue);
+                    console.log(`[🚨 REGRA 1] Outlier crítico detectado na Temperatura: ${tempValue}`);
+
+                }
+                if (humidityValue !== 0 && (humidityValue > UCL_3_H || humidityValue < LCL_3_H)) {
+                    humidityOutliers.push(humidityValue);
+                    console.log(`[🚨 REGRA 1] Outlier crítico detectado na Umidade: ${humidityValue}`);
+
+                }
+
+
+
+                // ⚠️ Regra 2: 2 de 3 pontos consecutivos além de 2σ
+                if (i >= 2 &&
+                    (tempMean[i] !== 0 && tempMean[i - 1] !== 0) &&  // Ignorar `0`
+                    ((tempMean[i] > UCL_2 && tempMean[i - 1] > UCL_2) ||
+                    (tempMean[i] < LCL_2 && tempMean[i - 1] < LCL_2))) {
+                    tempShiftWarnings.push(tempValue);
+                    console.log(`[⚠️ REGRA 2] Possível deslocamento na Temperatura (2/3 pontos além de 2σ)`);
+
+                }
+
+                // ⚠️ Regra 3: 4 de 5 pontos consecutivos além de 1σ
+                if (i >= 4) {
+                    let countAbove = 0, countBelow = 0;
+                    for (let j = 0; j < 5; j++) {
+                        if (tempMean[i - j] !== 0) {  // Ignorar `0`
+                            if (tempMean[i - j] > UCL_1) countAbove++;
+                            if (tempMean[i - j] < LCL_1) countBelow++;
+                        }
+                    }
+                    if (countAbove >= 4 || countBelow >= 4) {
+                        tempShiftWarnings.push(tempValue);
+                        console.log(`[⚠️ REGRA 3] Possível deslocamento na Temperatura (4/5 pontos além de 1σ)`);
+
+                    }
+                }
+
+                // ⚠️ Regra 4: 8 pontos consecutivos acima ou abaixo da média
+                if (i >= 7) {
+                    let countAbove = 0, countBelow = 0;
+                    for (let j = 0; j < 8; j++) {
+                        if (tempMean[i - j] !== 0) {  // Ignorar `0`
+                            if (tempMean[i - j] > avgTemp) countAbove++;
+                            if (tempMean[i - j] < avgTemp) countBelow++;
+                        }
+                    }
+                    if (countAbove === 8 || countBelow === 8) {
+                        tempShiftWarnings.push(tempValue);
+                        console.log(`[⚠️ REGRA 4] Mudança no processo (8 pontos consecutivos acima ou abaixo da média)`);
+
+                    }
+                }
+
+
+            }
+
+            // Exibir alerta visual
+        function showAlert(message, color) {
+            const alertBox = document.getElementById("outlier-alert");
+            alertBox.style.display = "block";
+            alertBox.style.backgroundColor = color;
+            alertBox.innerText = message;
+
+            setTimeout(() => {
+                alertBox.style.display = "none";
+            }, 5000);
+        }
+        // 🚨 Outliers críticos (Regra 1) - Apenas novos outliers serão alertados
+        const newTempOutliers = tempOutliers.filter(outlier => !notifiedTempOutliers.has(outlier));
+        const newHumidityOutliers = humidityOutliers.filter(outlier => !notifiedHumidityOutliers.has(outlier));
+        newTempOutliers.forEach(outlier => notifiedTempOutliers.add(outlier));
+        newHumidityOutliers.forEach(outlier => notifiedHumidityOutliers.add(outlier));
+
+        // ⚠️ Deslocamentos indicativos (Regras 2, 3 e 4) - Apenas novos deslocamentos serão alertados
+        const newTempShifts = tempShiftWarnings.filter(shift => !notifiedTempShifts.has(shift));
+        const newHumidityShifts = humidityShiftWarnings.filter(shift => !notifiedHumidityShifts.has(shift));
+        newTempShifts.forEach(shift => notifiedTempShifts.add(shift));
+        newHumidityShifts.forEach(shift => notifiedHumidityShifts.add(shift));
+
+
+        // 🚨 Acionar alerta Vermelho para Outliers, ignorando `0`
+        if (tempOutliers.some(val => val !== 0) || humidityOutliers.some(val => val !== 0)) {
+            showAlert("🚨 Alerta Vermelho: Outlier Crítico Detectado!", "red");
+        }
+
+        // ⚠️ Acionar alerta Amarelo para deslocamentos (shifts), ignorando `0`
+        if (tempShiftWarnings.some(val => val !== 0) || humidityShiftWarnings.some(val => val !== 0)) {
+            showAlert("⚠️ Alerta Amarelo: Possível Deslocamento no Processo!", "yellow");
+        }
+
+        }
+
+
 
             // Gráfico para Temperatura
             const tempCtx = document.getElementById("tempChart").getContext("2d");
@@ -212,8 +386,8 @@
                             {
                                 label: "Desvio Padrão Temperatura",
                                 data: data.temperature_stdevs,  // Desvio padrão de Temperatura
-                                borderColor: "rgba(69, 69, 420, 1)",
-                                backgroundColor: "rgba(69, 69, 420, 0.2)",
+                                borderColor: "rgba(69, 69, 255, 1)",
+                                backgroundColor: "rgba(69, 69, 255, 0.2)",
                                 borderWidth: 2,
                                 fill: false,
                                 tension: 0.4,
@@ -347,8 +521,8 @@
                             {
                                 label: "Desvio Padrão Umidade",
                                 data: data.humidity_stdevs,  // Desvio padrão de Umidade
-                                borderColor: "rgba(69, 69, 420, 1)",
-                                backgroundColor: "rgba(69, 69, 420, 0.2)",
+                                borderColor: "rgba(69, 69, 255, 1)",
+                                backgroundColor: "rgba(69, 69, 255, 0.2)",
                                 borderWidth: 2,
                                 fill: false,
                                 tension: 0.4,
