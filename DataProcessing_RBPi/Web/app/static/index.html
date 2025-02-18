@@ -56,6 +56,21 @@
         ⚠️ Alerta: Outlier identificado!
     </div>
 
+        <div id="shift-alert" style="
+        display: none;
+        padding: 10px;
+        background: yellow;
+        color: black;
+        font-weight: bold;
+        border-radius: 5px;
+        margin: 10px auto;
+        max-width: 600px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    ">
+        ⚠️ Alerta: Deslocamento detectado no processo!
+    </div>
+
+
     <main>
         <!-- Divs para separar os gráficos -->
         <div class="chart-container" id="tempChartContainer">
@@ -81,7 +96,7 @@
 
         const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         const ws = new WebSocket(protocol + window.location.host + "/api/ws");
-    
+
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             console.log("📡 Dados recebidos:", data);
@@ -159,34 +174,39 @@
             }
             checkOutliersAndWarn(data);
             checkWesternElectricRules(data);
+            
 
-            function checkOutliersAndWarn(data) {
-                // Achata os arrays e remove valores 0
-                const tempOutliers = data.temp_resultados.flat().filter(outlier => outlier !== 0);
-                const humidityOutliers = data.humidity_resultados.flat().filter(outlier => outlier !== 0);
+        function checkOutliersAndWarn(data) {
+            // Achata os arrays e remove valores 0
+            const tempOutliers = data.temp_resultados.flat().filter(outlier => outlier !== 0);
+            const humidityOutliers = data.humidity_resultados.flat().filter(outlier => outlier !== 0);
 
-                console.log("Outliers filtrados (Temperatura):", tempOutliers);
-                console.log("Outliers filtrados (Umidade):", humidityOutliers);
+            console.log("Outliers filtrados (Temperatura):", tempOutliers);
+            console.log("Outliers filtrados (Umidade):", humidityOutliers);
 
                 // Filtrar apenas outliers ainda não notificados
-                const newTempOutliers = tempOutliers.filter(outlier => !notifiedTempOutliers.has(outlier));
-                const newHumidityOutliers = humidityOutliers.filter(outlier => !notifiedHumidityOutliers.has(outlier));
+            const newTempOutliers = tempOutliers.filter(outlier => !notifiedTempOutliers.has(outlier));
+            const newHumidityOutliers = humidityOutliers.filter(outlier => !notifiedHumidityOutliers.has(outlier));
 
                 // Se houver novos outliers, armazená-los e exibir alerta
-                if (newTempOutliers.length > 0 || newHumidityOutliers.length > 0) {
+            if (newTempOutliers.length > 0 || newHumidityOutliers.length > 0) {
                     // Adicionar os novos outliers ao conjunto de notificados
-                    newTempOutliers.forEach(outlier => notifiedTempOutliers.add(outlier));
-                    newHumidityOutliers.forEach(outlier => notifiedHumidityOutliers.add(outlier));
+                newTempOutliers.forEach(outlier => notifiedTempOutliers.add(outlier));
+                newHumidityOutliers.forEach(outlier => notifiedHumidityOutliers.add(outlier));
 
                     // Exibir o alerta
-                    const alertBox = document.getElementById("outlier-alert");
-                    alertBox.style.display = "block";
+                const alertBox = document.getElementById("outlier-alert");
+                alertBox.style.display = "block";
 
-                    setTimeout(() => {
-                        alertBox.style.display = "none";
-                    }, 5000); // Oculta o alerta após 5 segundos
-                }
+                setTimeout(() => {
+                    alertBox.style.display = "none";
+                }, 5000); // Oculta o alerta após 5 segundos
             }
+        }
+
+        // Objetos para rastrear se já foi detectado um alerta específico
+        let westernElectricWarningsTemp = { regra1: false, regra2: false, regra3: false, regra4: false };
+        let westernElectricWarningsHumidity = { regra1: false, regra2: false, regra3: false, regra4: false };
 
         // 🚨 Verifica regras da Western Electric
         function checkWesternElectricRules(data) {
@@ -223,15 +243,13 @@
                 if (tempValue !== 0 && (tempValue > UCL_3 || tempValue < LCL_3)) {
                     tempOutliers.push(tempValue);
                     console.log(`[🚨 REGRA 1] Outlier crítico detectado na Temperatura: ${tempValue}`);
-
+                    showAlert(`🚨 Outlier crítico detectado na Temperatura: ${tempValue}`, "red", "outlier");
                 }
                 if (humidityValue !== 0 && (humidityValue > UCL_3_H || humidityValue < LCL_3_H)) {
                     humidityOutliers.push(humidityValue);
                     console.log(`[🚨 REGRA 1] Outlier crítico detectado na Umidade: ${humidityValue}`);
-
+                    showAlert(`🚨 Outlier crítico detectado na Umidade: ${humidityValue}`, "red", "outlier");
                 }
-
-
 
                 // ⚠️ Regra 2: 2 de 3 pontos consecutivos além de 2σ
                 if (i >= 2 &&
@@ -240,7 +258,7 @@
                     (tempMean[i] < LCL_2 && tempMean[i - 1] < LCL_2))) {
                     tempShiftWarnings.push(tempValue);
                     console.log(`[⚠️ REGRA 2] Possível deslocamento na Temperatura (2/3 pontos além de 2σ)`);
-
+                    showAlert(`⚠️ Possível deslocamento na Temperatura (2/3 pontos além de 2σ)`, "yellow", "shift");
                 }
 
                 // ⚠️ Regra 3: 4 de 5 pontos consecutivos além de 1σ
@@ -255,7 +273,7 @@
                     if (countAbove >= 4 || countBelow >= 4) {
                         tempShiftWarnings.push(tempValue);
                         console.log(`[⚠️ REGRA 3] Possível deslocamento na Temperatura (4/5 pontos além de 1σ)`);
-
+                        showAlert(`⚠️ Possível deslocamento na Temperatura (4/5 pontos além de 1σ)`, "yellow", "shift");
                     }
                 }
 
@@ -271,24 +289,26 @@
                     if (countAbove === 8 || countBelow === 8) {
                         tempShiftWarnings.push(tempValue);
                         console.log(`[⚠️ REGRA 4] Mudança no processo (8 pontos consecutivos acima ou abaixo da média)`);
-
+                        showAlert(`⚠️ Mudança no processo (8 pontos consecutivos acima ou abaixo da média)`, "yellow", "shift");
                     }
                 }
-
-
             }
 
-            // Exibir alerta visual
-        function showAlert(message, color) {
-            const alertBox = document.getElementById("outlier-alert");
-            alertBox.style.display = "block";
-            alertBox.style.backgroundColor = color;
-            alertBox.innerText = message;
 
-            setTimeout(() => {
-                alertBox.style.display = "none";
-            }, 5000);
-        }
+
+            // 🔔 Função de alerta visual otimizada
+            function showAlert(message, color, alertType = "outlier") {
+                const alertBox = alertType === "outlier" ? document.getElementById("outlier-alert") : document.getElementById("shift-alert");
+
+                alertBox.style.display = "block";
+                alertBox.style.backgroundColor = color;
+                alertBox.innerText = message;
+
+                setTimeout(() => {
+                    alertBox.style.display = "none";
+                }, 5000);
+            }
+
         // 🚨 Outliers críticos (Regra 1) - Apenas novos outliers serão alertados
         const newTempOutliers = tempOutliers.filter(outlier => !notifiedTempOutliers.has(outlier));
         const newHumidityOutliers = humidityOutliers.filter(outlier => !notifiedHumidityOutliers.has(outlier));
@@ -300,17 +320,6 @@
         const newHumidityShifts = humidityShiftWarnings.filter(shift => !notifiedHumidityShifts.has(shift));
         newTempShifts.forEach(shift => notifiedTempShifts.add(shift));
         newHumidityShifts.forEach(shift => notifiedHumidityShifts.add(shift));
-
-
-        // 🚨 Acionar alerta Vermelho para Outliers, ignorando `0`
-        if (tempOutliers.some(val => val !== 0) || humidityOutliers.some(val => val !== 0)) {
-            showAlert("🚨 Alerta Vermelho: Outlier Crítico Detectado!", "red");
-        }
-
-        // ⚠️ Acionar alerta Amarelo para deslocamentos (shifts), ignorando `0`
-        if (tempShiftWarnings.some(val => val !== 0) || humidityShiftWarnings.some(val => val !== 0)) {
-            showAlert("⚠️ Alerta Amarelo: Possível Deslocamento no Processo!", "yellow");
-        }
 
         }
 
