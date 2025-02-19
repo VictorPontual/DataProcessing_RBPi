@@ -32,18 +32,22 @@ A aplicação gera gráficos interativos que são atualizados automaticamente à
    ```
 3. Abra WEB e RBPi separadamente e baixe suas dependencias separadamente.
 
-4. Instale as dependências necessárias:
+4. Instale as dependências necessárias(WEB e RBPi):
    ```bash
    pip install -r requirements.txt
    ```
-5. Execute a aplicação:
+5. Execute a aplicação(WEB)
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+6. Execute a aplicação(RBPi):
    ```bash
    python main.py
    ```
-6. Acesse a aplicação em **localhost** para facilitar os testes:
+7. Acesse a aplicação em **localhost** para facilitar os testes:
    ```
-   http://localhost:5000
+   http://localhost:8000
    ```
-7. Caso precise compartilhar externamente, a aplicação já foi testada com o **ngrok** e funcionou perfeitamente.
+8. Caso precise compartilhar externamente, a aplicação já foi testada com o **ngrok** e funcionou perfeitamente.
 
 ---
